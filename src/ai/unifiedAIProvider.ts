@@ -5,6 +5,11 @@
  * while maintaining a single internal contract for TestFox.
  */
 
+import { fetchWithTimeout, DEFAULT_PROBE_TIMEOUT_MS, DEFAULT_GENERATION_TIMEOUT_MS } from '../utils/fetchWithTimeout';
+
+/** Model pulls download weights and can legitimately take several minutes. */
+const OLLAMA_PULL_TIMEOUT_MS = 10 * 60 * 1000;
+
 // ===== UNIFIED SCHEMA =====
 
 export interface LLMProviderConfig {
@@ -44,7 +49,8 @@ export interface ConnectionTestResult {
 export class OllamaAdapter {
   static async call(config: LLMProviderConfig, req: LLMRequest): Promise<LLMResponse> {
     try {
-      const response = await fetch(`${config.baseUrl}/api/chat`, {
+      const response = await fetchWithTimeout(`${config.baseUrl}/api/chat`, {
+        timeoutMs: DEFAULT_GENERATION_TIMEOUT_MS,
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -75,7 +81,7 @@ export class OllamaAdapter {
   static async testConnection(baseUrl: string): Promise<ConnectionTestResult> {
     try {
       const startTime = Date.now();
-      const response = await fetch(`${baseUrl}/api/tags`);
+      const response = await fetchWithTimeout(`${baseUrl}/api/tags`, { timeoutMs: DEFAULT_PROBE_TIMEOUT_MS });
       const latency = Date.now() - startTime;
 
       if (!response.ok) {
@@ -104,7 +110,8 @@ export class OllamaAdapter {
   static async ensureModel(config: LLMProviderConfig): Promise<boolean> {
     try {
       // Check if model exists
-      const testResponse = await fetch(`${config.baseUrl}/api/show`, {
+      const testResponse = await fetchWithTimeout(`${config.baseUrl}/api/show`, {
+        timeoutMs: DEFAULT_PROBE_TIMEOUT_MS,
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -120,7 +127,8 @@ export class OllamaAdapter {
 
       // Try to pull the model
       console.log(`🦊 Ollama: Model ${config.model} not found, attempting to pull...`);
-      const pullResponse = await fetch(`${config.baseUrl}/api/pull`, {
+      const pullResponse = await fetchWithTimeout(`${config.baseUrl}/api/pull`, {
+        timeoutMs: OLLAMA_PULL_TIMEOUT_MS,
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -154,7 +162,8 @@ export class CustomAdapter {
         stream: req.stream ?? false
       };
 
-      const response = await fetch(config.baseUrl, {
+      const response = await fetchWithTimeout(config.baseUrl, {
+        timeoutMs: DEFAULT_GENERATION_TIMEOUT_MS,
         method: "POST",
         headers: {
           "Authorization": `Bearer ${config.apiKey}`,
@@ -188,7 +197,8 @@ export class CustomAdapter {
         temperature: 0.1
       };
 
-      const response = await fetch(config.baseUrl, {
+      const response = await fetchWithTimeout(config.baseUrl, {
+        timeoutMs: DEFAULT_PROBE_TIMEOUT_MS,
         method: "POST",
         headers: {
           "Authorization": `Bearer ${config.apiKey}`,

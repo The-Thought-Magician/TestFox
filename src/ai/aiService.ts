@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { getOpenRouterClient } from './openRouterClient';
 import { checkAndRecordUsage, PremiumService, PremiumFeature } from '../premium/premiumService';
 import { ContextAnalyzer } from '../core/contextAnalyzer';
+import { fetchWithTimeout, resolveTimeoutMs, DEFAULT_PROBE_TIMEOUT_MS, DEFAULT_GENERATION_TIMEOUT_MS } from '../utils/fetchWithTimeout';
 
 /**
  * AI Provider Types
@@ -144,6 +145,16 @@ export class AIService {
     updateConfig(config: Partial<AIServiceConfig>): void {
         this.config = { ...this.config, ...config };
         this.initializeProvider();
+    }
+
+    /**
+     * Generation timeout in milliseconds, configurable via the
+     * "testfox.ai.requestTimeout" setting (default 120s). Lightweight
+     * availability/model-list calls always use the short probe timeout.
+     */
+    private getGenerationTimeoutMs(): number {
+        const configured = vscode.workspace.getConfiguration('testfox').get<number>('ai.requestTimeout');
+        return resolveTimeoutMs(configured, DEFAULT_GENERATION_TIMEOUT_MS);
     }
 
     /**
@@ -487,7 +498,8 @@ ${contextData.coreLogic.substring(0, 2000)}...`;
 
     private async generateWithDeepSeek(request: AIGenerationRequest): Promise<AIServiceResponse> {
         try {
-            const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+            const response = await fetchWithTimeout(`${this.config.baseUrl}/chat/completions`, {
+            timeoutMs: this.getGenerationTimeoutMs(),
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -509,7 +521,7 @@ ${contextData.coreLogic.substring(0, 2000)}...`;
             return { success: true, data: result.choices[0]?.message?.content };
         } catch (error) {
             console.error('❌ DeepSeek: Generation failed:', error);
-            return { success: false, error: 'DeepSeek generation failed' };
+            return { success: false, error: `DeepSeek generation failed: ${error instanceof Error ? error.message : 'Unknown error'}` };
         }
     }
 
@@ -547,7 +559,8 @@ ${contextData.coreLogic.substring(0, 2000)}...`;
         try {
             const url = `${this.config.baseUrl}/models/${this.config.model}:generateContent?key=${this.config.apiKey}`;
 
-            const response = await fetch(url, {
+            const response = await fetchWithTimeout(url, {
+            timeoutMs: this.getGenerationTimeoutMs(),
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -580,7 +593,7 @@ ${contextData.coreLogic.substring(0, 2000)}...`;
             }
         } catch (error) {
             console.error('❌ Google Gemini: Generation failed:', error);
-            return { success: false, error: 'Google Gemini generation failed' };
+            return { success: false, error: `Google Gemini generation failed: ${error instanceof Error ? error.message : 'Unknown error'}` };
         }
     }
 
@@ -616,7 +629,7 @@ ${contextData.coreLogic.substring(0, 2000)}...`;
     private async checkOllamaAvailability(): Promise<boolean> {
         try {
             // Check if Ollama is running locally
-            const response = await fetch(`${this.config.baseUrl || 'http://localhost:11434'}/api/tags`);
+            const response = await fetchWithTimeout(`${this.config.baseUrl || 'http://localhost:11434'}/api/tags`, { timeoutMs: DEFAULT_PROBE_TIMEOUT_MS });
             return response.ok;
         } catch {
             return false;
@@ -625,7 +638,8 @@ ${contextData.coreLogic.substring(0, 2000)}...`;
 
     private async generateWithOllama(request: AIGenerationRequest): Promise<AIServiceResponse> {
         try {
-            const response = await fetch(`${this.config.baseUrl || 'http://localhost:11434'}/api/generate`, {
+            const response = await fetchWithTimeout(`${this.config.baseUrl || 'http://localhost:11434'}/api/generate`, {
+            timeoutMs: this.getGenerationTimeoutMs(),
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -650,13 +664,13 @@ ${contextData.coreLogic.substring(0, 2000)}...`;
             return { success: false, error: 'Invalid result format' };
         } catch (error) {
             console.error('❌ Ollama: Generation failed:', error);
-            return { success: false, error: 'Ollama generation failed' };
+            return { success: false, error: `Ollama generation failed: ${error instanceof Error ? error.message : 'Unknown error'}` };
         }
     }
 
     private async getOllamaModels(): Promise<AIModel[]> {
         try {
-            const response = await fetch(`${this.config.baseUrl || 'http://localhost:11434'}/api/tags`);
+            const response = await fetchWithTimeout(`${this.config.baseUrl || 'http://localhost:11434'}/api/tags`, { timeoutMs: DEFAULT_PROBE_TIMEOUT_MS });
             if (!response.ok) return [];
 
             const data: any = await response.json();
@@ -677,7 +691,7 @@ ${contextData.coreLogic.substring(0, 2000)}...`;
     private async checkLMStudioAvailability(): Promise<boolean> {
         try {
             // LMStudio typically runs on localhost:1234
-            const response = await fetch(`${this.config.baseUrl || 'http://localhost:1234'}/v1/models`);
+            const response = await fetchWithTimeout(`${this.config.baseUrl || 'http://localhost:1234'}/v1/models`, { timeoutMs: DEFAULT_PROBE_TIMEOUT_MS });
             return response.ok;
         } catch {
             return false;
@@ -686,7 +700,8 @@ ${contextData.coreLogic.substring(0, 2000)}...`;
 
     private async generateWithLMStudio(request: AIGenerationRequest): Promise<AIServiceResponse> {
         try {
-            const response = await fetch(`${this.config.baseUrl || 'http://localhost:1234'}/v1/chat/completions`, {
+            const response = await fetchWithTimeout(`${this.config.baseUrl || 'http://localhost:1234'}/v1/chat/completions`, {
+            timeoutMs: this.getGenerationTimeoutMs(),
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -705,13 +720,13 @@ ${contextData.coreLogic.substring(0, 2000)}...`;
             return { success: true, data: result.choices[0]?.message?.content };
         } catch (error) {
             console.error('❌ LMStudio: Generation failed:', error);
-            return { success: false, error: 'LMStudio generation failed' };
+            return { success: false, error: `LMStudio generation failed: ${error instanceof Error ? error.message : 'Unknown error'}` };
         }
     }
 
     private async getLMStudioModels(): Promise<AIModel[]> {
         try {
-            const response = await fetch(`${this.config.baseUrl || 'http://localhost:1234'}/v1/models`);
+            const response = await fetchWithTimeout(`${this.config.baseUrl || 'http://localhost:1234'}/v1/models`, { timeoutMs: DEFAULT_PROBE_TIMEOUT_MS });
             if (!response.ok) return [];
 
             const data: any = await response.json();
@@ -736,7 +751,8 @@ ${contextData.coreLogic.substring(0, 2000)}...`;
         try {
             if (!this.config.apiKey || !this.config.baseUrl) return false;
             const url = `${this.config.baseUrl.replace(/\/$/, '')}/chat/completions`;
-            const res = await fetch(url, {
+            const res = await fetchWithTimeout(url, {
+            timeoutMs: DEFAULT_PROBE_TIMEOUT_MS,
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -763,7 +779,8 @@ ${contextData.coreLogic.substring(0, 2000)}...`;
                 stream: false
             };
 
-            const res = await fetch(url, {
+            const res = await fetchWithTimeout(url, {
+            timeoutMs: this.getGenerationTimeoutMs(),
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -782,7 +799,7 @@ ${contextData.coreLogic.substring(0, 2000)}...`;
             return { success: true, data: content };
         } catch (error) {
             console.error('❌ Amazon Nova: Generation failed:', error);
-            return { success: false, error: 'Amazon Nova generation failed' };
+            return { success: false, error: `Amazon Nova generation failed: ${error instanceof Error ? error.message : 'Unknown error'}` };
         }
     }
 
@@ -804,7 +821,8 @@ ${contextData.coreLogic.substring(0, 2000)}...`;
         try {
             if (!this.config.apiKey || !this.config.baseUrl) return false;
             const url = `${this.config.baseUrl.replace(/\/$/, '')}/chat/completions`;
-            const res = await fetch(url, {
+            const res = await fetchWithTimeout(url, {
+            timeoutMs: DEFAULT_PROBE_TIMEOUT_MS,
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -814,8 +832,7 @@ ${contextData.coreLogic.substring(0, 2000)}...`;
                     model: this.config.model || 'moonshotai/kimi-k2.5',
                     messages: [{ role: 'user', content: 'Connection test' }],
                     max_tokens: 1
-                }),
-                timeout: 15000 as any
+                })
             });
 
             return res.ok;
@@ -836,7 +853,8 @@ ${contextData.coreLogic.substring(0, 2000)}...`;
                 stream: false
             };
 
-            const res = await fetch(url, {
+            const res = await fetchWithTimeout(url, {
+            timeoutMs: this.getGenerationTimeoutMs(),
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -857,7 +875,7 @@ ${contextData.coreLogic.substring(0, 2000)}...`;
             return { success: true, data: content };
         } catch (error) {
             console.error('❌ NVIDIA NIM: Generation failed:', error);
-            return { success: false, error: 'NVIDIA NIM generation failed' };
+            return { success: false, error: `NVIDIA NIM generation failed: ${error instanceof Error ? error.message : 'Unknown error'}` };
         }
     }
 
@@ -883,7 +901,8 @@ ${contextData.coreLogic.substring(0, 2000)}...`;
 
     private async generateWithBYOApi(request: AIGenerationRequest): Promise<AIServiceResponse> {
         try {
-            const response = await fetch(`${this.config.baseUrl}/chat/completions`, {
+            const response = await fetchWithTimeout(`${this.config.baseUrl}/chat/completions`, {
+            timeoutMs: this.getGenerationTimeoutMs(),
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -905,13 +924,14 @@ ${contextData.coreLogic.substring(0, 2000)}...`;
             return { success: true, data: result.choices[0]?.message?.content };
         } catch (error) {
             console.error('❌ BYO API: Generation failed:', error);
-            return { success: false, error: 'BYO API generation failed' };
+            return { success: false, error: `BYO API generation failed: ${error instanceof Error ? error.message : 'Unknown error'}` };
         }
     }
 
     private async getBYOApiModels(): Promise<AIModel[]> {
         try {
-            const response = await fetch(`${this.config.baseUrl}/models`, {
+            const response = await fetchWithTimeout(`${this.config.baseUrl}/models`, {
+            timeoutMs: DEFAULT_PROBE_TIMEOUT_MS,
                 headers: {
                     'Authorization': `Bearer ${this.config.apiKey}`
                 }

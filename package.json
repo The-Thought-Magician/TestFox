@@ -576,6 +576,12 @@
           "default": "meta-llama/llama-3.1-8b-instruct:free",
           "description": "Fallback AI model (free) when primary model fails"
         },
+        "testfox.ai.requestTimeout": {
+          "type": "number",
+          "default": 120000,
+          "minimum": 1000,
+          "description": "Timeout in milliseconds for AI generation requests. Requests that exceed this are cancelled with a clear timeout error instead of hanging."
+        },
         "testfox.automation.enabled": {
           "type": "boolean",
           "default": false,

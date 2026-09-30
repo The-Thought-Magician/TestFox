@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { fetchWithTimeout, resolveTimeoutMs, DEFAULT_PROBE_TIMEOUT_MS, DEFAULT_GENERATION_TIMEOUT_MS } from '../utils/fetchWithTimeout';
 
 /**
  * OpenRouter Service - AI-powered test generation using OpenRouter API
@@ -59,6 +60,12 @@ export class OpenRouterService {
         
         // Load API key from .env file
         this.loadApiKeyFromEnv();
+    }
+
+    /** Generation timeout, configurable via "testfox.ai.requestTimeout" (default 120s). */
+    private getGenerationTimeoutMs(): number {
+        const configured = vscode.workspace.getConfiguration('testfox').get<number>('ai.requestTimeout');
+        return resolveTimeoutMs(configured, DEFAULT_GENERATION_TIMEOUT_MS);
     }
 
     /**
@@ -193,7 +200,8 @@ export class OpenRouterService {
         this.outputChannel.appendLine(`🚀 Sending request to OpenRouter (model: ${model})...`);
 
         try {
-            const response = await fetch(`${this.baseUrl}/chat/completions`, {
+            const response = await fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
+                timeoutMs: this.getGenerationTimeoutMs(),
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.apiKey}`,
@@ -338,7 +346,8 @@ Please provide:
         }
 
         try {
-            const response = await fetch(`${this.baseUrl}/models`, {
+            const response = await fetchWithTimeout(`${this.baseUrl}/models`, {
+                timeoutMs: DEFAULT_PROBE_TIMEOUT_MS,
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${this.apiKey}`,
@@ -357,7 +366,8 @@ Please provide:
             }
 
             // Test with a minimal chat completion
-            const chatResponse = await fetch(`${this.baseUrl}/chat/completions`, {
+            const chatResponse = await fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
+                timeoutMs: DEFAULT_PROBE_TIMEOUT_MS,
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.apiKey}`,
@@ -391,7 +401,8 @@ Please provide:
      */
     async getAvailableModels(): Promise<Array<{ id: string; name: string; description: string }>> {
         try {
-            const response = await fetch(`${this.baseUrl}/models`, {
+            const response = await fetchWithTimeout(`${this.baseUrl}/models`, {
+                timeoutMs: DEFAULT_PROBE_TIMEOUT_MS,
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${this.apiKey || ''}`,
@@ -443,7 +454,8 @@ Please provide:
         const temperature = options?.temperature || 0.7;
 
         try {
-            const response = await fetch(`${this.baseUrl}/chat/completions`, {
+            const response = await fetchWithTimeout(`${this.baseUrl}/chat/completions`, {
+                timeoutMs: this.getGenerationTimeoutMs(),
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${this.apiKey}`,
