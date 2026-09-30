@@ -54,7 +54,7 @@ suite('secureKeyStore', () => {
         assert.strictEqual(migrated, true);
         assert.strictEqual(await secrets.get('testfox.ai.apiKey'), 'sk-legacy-123');
         assert.strictEqual(
-            vscode.workspace.getConfiguration('testfox').get<string>('ai.apiKey'),
+            vscode.workspace.getConfiguration('testfox').inspect<string>('ai.apiKey')?.globalValue,
             undefined,
             'legacy plaintext setting must be removed after migration'
         );
@@ -77,7 +77,7 @@ suite('secureKeyStore', () => {
         assert.strictEqual(await secrets.get('testfox.ai.apiKey'), 'sk-new');
         assert.strictEqual(getCachedApiKey(), 'sk-new');
         assert.strictEqual(
-            vscode.workspace.getConfiguration('testfox').get<string>('ai.apiKey'),
+            vscode.workspace.getConfiguration('testfox').inspect<string>('ai.apiKey')?.globalValue,
             undefined
         );
 
