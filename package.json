@@ -479,10 +479,13 @@
           "enum": [
             "html",
             "json",
-            "both"
+            "both",
+            "junit",
+            "sarif",
+            "ci"
           ],
           "default": "html",
-          "description": "Test report output format"
+          "description": "Test report output format ('junit' and 'sarif' are CI-friendly; 'ci' writes both)"
         },
         "testfox.securityTestLevel": {
           "type": "string",

@@ -13,12 +13,19 @@ import {
     TestCategory,
     TestStatus
 } from '../types';
+import { toJUnitXml, toSarif } from './ciReportSerializer';
 
 export interface ReportGeneratorOptions {
     projectInfo?: ProjectInfo | null;
     tests: TestCase[];
     results: TestResult[];
-    format: 'html' | 'json' | 'both';
+    /**
+     * 'html' | 'json' | 'both' - human-readable reports.
+     * 'junit' - JUnit XML for CI test reporting.
+     * 'sarif' - SARIF 2.1.0 for CI code scanning.
+     * 'ci'    - writes both JUnit XML and SARIF.
+     */
+    format: 'html' | 'json' | 'both' | 'junit' | 'sarif' | 'ci';
 }
 
 /**
@@ -58,6 +65,21 @@ export class ReportGenerator {
             fs.writeFileSync(jsonPath, JSON.stringify(report, null, 2), 'utf-8');
             if (options.format === 'json') {
                 outputPath = jsonPath;
+            }
+        }
+
+        if (options.format === 'junit' || options.format === 'ci') {
+            const junitPath = path.join(reportsDir, `testfox-report-${timestamp}.junit.xml`);
+            fs.writeFileSync(junitPath, toJUnitXml(report), 'utf-8');
+            outputPath = junitPath;
+        }
+
+        if (options.format === 'sarif' || options.format === 'ci') {
+            const version = this.context.extension?.packageJSON?.version ?? 'unknown';
+            const sarifPath = path.join(reportsDir, `testfox-report-${timestamp}.sarif`);
+            fs.writeFileSync(sarifPath, toSarif(report, version), 'utf-8');
+            if (options.format === 'sarif') {
+                outputPath = sarifPath;
             }
         }
 

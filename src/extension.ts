@@ -3623,7 +3623,7 @@ async function exportReport(): Promise<void> {
                 projectInfo,
                 tests,
                 results,
-                format: format as 'html' | 'json' | 'both'
+                format: format as 'html' | 'json' | 'both' | 'junit' | 'sarif' | 'ci'
             });
 
             updateStatus('ready');
