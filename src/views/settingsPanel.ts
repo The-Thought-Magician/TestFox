@@ -3,6 +3,7 @@ import { IssueTracker } from '../integrations/issueTracker';
 import { createAIService, AIProvider } from '../ai/aiService';
 import { exec } from 'child_process';
 import * as path from 'path';
+import { setApiKey, getApiKey } from '../core/secureKeyStore';
 
 
 /**
@@ -148,7 +149,7 @@ export class SettingsPanel {
                 await config.update('ai.provider', settings.aiProvider, vscode.ConfigurationTarget.Global);
             }
             if (settings.aiApiKey) {
-                await config.update('ai.apiKey', settings.aiApiKey, vscode.ConfigurationTarget.Global);
+                await setApiKey(settings.aiApiKey);
             }
             if (settings.aiBaseUrl) {
                 await config.update('ai.baseUrl', settings.aiBaseUrl, vscode.ConfigurationTarget.Global);
@@ -204,7 +205,7 @@ export class SettingsPanel {
             // AI Settings
             aiEnabled: config.get('ai.enabled', true),
             aiProvider: config.get('ai.provider', 'openrouter'),
-            aiApiKey: config.get('ai.apiKey', ''),
+            aiApiKey: await getApiKey(),
             aiBaseUrl: config.get('ai.baseUrl', ''),
             aiModel: config.get('ai.model', 'google/gemini-2.0-flash-exp:free'),
             fallbackModel: config.get('ai.fallbackModel', 'meta-llama/llama-3.1-8b-instruct:free'),

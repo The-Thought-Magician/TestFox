@@ -7,6 +7,7 @@
  */
 
 import * as vscode from 'vscode';
+import { setApiKey, getCachedApiKey } from '../core/secureKeyStore';
 
 export class AISetupPanel {
     public static currentPanel: AISetupPanel | undefined;
@@ -99,7 +100,7 @@ export class AISetupPanel {
         try {
             const config = vscode.workspace.getConfiguration('testfox');
             await config.update('ai.provider', data.provider, vscode.ConfigurationTarget.Global);
-            await config.update('ai.apiKey', data.apiKey, vscode.ConfigurationTarget.Global);
+            await setApiKey(data.apiKey);
             await config.update('ai.model', data.model, vscode.ConfigurationTarget.Global);
             await config.update('ai.baseUrl', data.baseUrl, vscode.ConfigurationTarget.Global);
             await config.update('ai.enabled', true, vscode.ConfigurationTarget.Global);
@@ -123,14 +124,13 @@ export class AISetupPanel {
     public static isConfigured(): boolean {
         const config = vscode.workspace.getConfiguration('testfox');
         const provider = config.get<string>('ai.provider', '');
-        const apiKey = config.get<string>('ai.apiKey', '');
         if (provider === 'ollama') return true;
-        return !!apiKey;
+        return !!getCachedApiKey();
     }
 
     private _getHtml(): string {
         const config = vscode.workspace.getConfiguration('testfox');
-        const curKey = config.get<string>('ai.apiKey', '');
+        const curKey = getCachedApiKey();
         const curModel = config.get<string>('ai.model', 'google/gemini-2.0-flash-exp:free');
         const curUrl = config.get<string>('ai.baseUrl', 'https://openrouter.ai/api/v1');
         const curProvider = config.get<string>('ai.provider', 'openrouter');

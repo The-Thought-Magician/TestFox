@@ -10,6 +10,7 @@
 
 import * as vscode from 'vscode';
 import { UnifiedAIProvider, LLMProviderConfig, validateProviderConfig } from '../ai/unifiedAIProvider';
+import { getApiKey, localOnlyViolation } from './secureKeyStore';
 
 export interface AIConnectionStatus {
     isConfigured: boolean;
@@ -89,7 +90,17 @@ export class AIConnectionManager {
         const provider = config.get<string>('ai.provider');
         const model = config.get<string>('ai.model');
         const baseUrl = config.get<string>('ai.baseUrl');
-        const apiKey = config.get<string>('ai.apiKey');
+        const apiKey = await getApiKey();
+
+        // Local-only mode blocks cloud providers before any configuration check
+        const localOnlyError = localOnlyViolation(provider);
+        if (localOnlyError) {
+            this.connectionStatus.isConfigured = false;
+            this.connectionStatus.isConnected = false;
+            this.connectionStatus.error = localOnlyError;
+            this.updateStatusBar();
+            return false;
+        }
 
         // Check if essential configuration exists
         if (!provider || !model) {
@@ -149,7 +160,7 @@ export class AIConnectionManager {
             const provider = config.get<string>('ai.provider');
             const model = config.get<string>('ai.model');
             const baseUrl = config.get<string>('ai.baseUrl');
-            const apiKey = config.get<string>('ai.apiKey');
+            const apiKey = await getApiKey();
 
             const providerConfig: LLMProviderConfig = {
                 providerType: resolveProviderType(provider!),

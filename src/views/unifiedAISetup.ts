@@ -6,6 +6,7 @@
 
 import * as vscode from 'vscode';
 import { UnifiedAIProvider, LLMProviderConfig, validateProviderConfig } from '../ai/unifiedAIProvider';
+import { setApiKey, clearApiKey, isLocalOnlyMode } from '../core/secureKeyStore';
 
 export class UnifiedAISetup {
   private panel?: vscode.WebviewPanel;
@@ -600,7 +601,7 @@ export class UnifiedAISetup {
       await vscodeConfig.update('ai.provider', 'ollama', vscode.ConfigurationTarget.Global);
       await vscodeConfig.update('ai.model', data.model, vscode.ConfigurationTarget.Global);
       await vscodeConfig.update('ai.baseUrl', data.host, vscode.ConfigurationTarget.Global);
-      await vscodeConfig.update('ai.apiKey', '', vscode.ConfigurationTarget.Global);
+      await clearApiKey(); // local providers need no key
 
       vscode.window.showInformationMessage(
         '✅ Ollama configuration saved successfully!',
@@ -648,12 +649,21 @@ export class UnifiedAISetup {
         return;
       }
 
-      // Save to VS Code settings
+      // Local-only mode: custom endpoints are only allowed when they stay on this machine
+      if (isLocalOnlyMode() && !/^(https?:\/\/)?(localhost|127\.0\.0\.1|::1)(:\d+)?/i.test(data.url)) {
+        vscode.window.showWarningMessage(
+          '🔒 TestFox local-only mode is enabled: custom cloud endpoints are disabled. Use Ollama or LM Studio, or turn off testfox.ai.localOnly.'
+        );
+        this._sendTestResult({ success: false, message: 'Blocked by local-only mode' });
+        return;
+      }
+
+      // Save to VS Code settings (API key goes to SecretStorage, never plaintext settings)
       const vscodeConfig = vscode.workspace.getConfiguration('testfox');
       await vscodeConfig.update('ai.provider', 'custom', vscode.ConfigurationTarget.Global);
       await vscodeConfig.update('ai.model', data.model, vscode.ConfigurationTarget.Global);
       await vscodeConfig.update('ai.baseUrl', data.url, vscode.ConfigurationTarget.Global);
-      await vscodeConfig.update('ai.apiKey', data.key, vscode.ConfigurationTarget.Global);
+      await setApiKey(data.key);
 
       vscode.window.showInformationMessage(
         '✅ Custom API configuration saved successfully!',

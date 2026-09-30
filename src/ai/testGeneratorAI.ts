@@ -11,6 +11,7 @@ import {
 } from '../types';
 import { ContextAnalyzer, PageContext } from '../core/contextAnalyzer';
 import { RuntimeAppInfo } from '../runtime/runtimeAppAnalyzer';
+import { getApiKey } from '../core/secureKeyStore';
 
 /**
  * AI-enhanced test generator using OpenRouter
@@ -21,15 +22,15 @@ export class TestGeneratorAI {
     private contextAnalyzer = new ContextAnalyzer();
 
     constructor(private testStore: TestStore) {
-        this.initializeAIService();
+        void this.initializeAIService();
     }
 
-    private initializeAIService(): void {
+    private async initializeAIService(): Promise<void> {
         try {
-            // Read AI configuration from VS Code settings
+            // Read AI configuration from VS Code settings (key from secure storage)
             const config = vscode.workspace.getConfiguration('testfox');
             const provider = config.get<string>('ai.provider') || 'openrouter';
-            const apiKey = config.get<string>('ai.apiKey') || '';
+            const apiKey = await getApiKey();
             const baseUrl = config.get<string>('ai.baseUrl') || '';
             const model = config.get<string>('ai.model') || '';
 
@@ -305,8 +306,7 @@ IMPORTANT REQUIREMENTS:
                 // Show warning but don't block test generation
                 // Only show error if AI was explicitly enabled but failed
                 // Don't show error if AI is simply not configured (onboarding will handle that)
-                const config = vscode.workspace.getConfiguration('testfox');
-                const apiKey = config.get<string>('ai.apiKey');
+                const apiKey = await getApiKey();
                 if (apiKey) {
                     // API key exists but connection failed - show error
                     vscode.window.showWarningMessage(`TestFox AI failed: ${message}. Using rule-based generation.`);

@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { getOpenRouterClient } from './openRouterClient';
 import { checkAndRecordUsage, PremiumService, PremiumFeature } from '../premium/premiumService';
 import { ContextAnalyzer } from '../core/contextAnalyzer';
+import { localOnlyViolation } from '../core/secureKeyStore';
 
 /**
  * AI Provider Types
@@ -150,6 +151,9 @@ export class AIService {
      * Check if the AI service is available and configured
      */
     async isAvailable(): Promise<boolean> {
+        if (localOnlyViolation(this.config.provider)) {
+            return false;
+        }
         try {
             switch (this.config.provider) {
             case AIProvider.OPENROUTER:
@@ -197,6 +201,12 @@ export class AIService {
                     success: false,
                     error: 'AI request limit exceeded. Upgrade to Pro for unlimited AI generation.'
                 };
+            }
+
+            const localOnlyError = localOnlyViolation(this.config.provider);
+            if (localOnlyError) {
+                console.log('🔒 AI Service: Blocked by local-only mode');
+                return { success: false, error: localOnlyError };
             }
 
             console.log(`🤖 AI Service: Generating ${request.type} using ${this.config.provider} with context analysis`);

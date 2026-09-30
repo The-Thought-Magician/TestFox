@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import axios, { AxiosInstance } from 'axios';
+import { getApiKey } from '../core/secureKeyStore';
 
 export type AIState =
   | 'unconfigured'
@@ -557,9 +558,9 @@ Consider configuring AI API keys for more comprehensive and context-aware test c
     /**
      * Load configuration from VS Code settings
      */
-    loadConfiguration(): void {
+    async loadConfiguration(): Promise<void> {
         const config = vscode.workspace.getConfiguration('testfox');
-        const apiKey = config.get<string>('ai.apiKey');
+        const apiKey = await getApiKey();
         const model = config.get<string>('ai.model');
         
         if (apiKey) {

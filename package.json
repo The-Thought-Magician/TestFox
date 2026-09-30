@@ -527,7 +527,13 @@
         "testfox.ai.apiKey": {
           "type": "string",
           "default": "",
-          "description": "API key for the selected AI provider"
+          "description": "Deprecated: API keys are now stored in VS Code SecretStorage. Any key saved here is migrated to secure storage automatically and removed from settings.",
+          "deprecationMessage": "API keys are stored in SecretStorage. Use the TestFox AI setup panel to configure your key."
+        },
+        "testfox.ai.localOnly": {
+          "type": "boolean",
+          "default": false,
+          "description": "Local-only AI mode: only on-device providers (Ollama, LM Studio) may be used. Cloud AI providers are blocked so no prompts or API keys ever leave this machine."
         },
         "testfox.ai.baseUrl": {
           "type": "string",

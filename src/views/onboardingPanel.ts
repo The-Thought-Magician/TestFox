@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { getOpenRouterClient } from '../ai/openRouterClient';
 import { GitAuth } from '../core/gitAuth';
+import { setApiKey, getCachedApiKey, hasApiKey } from '../core/secureKeyStore';
 
 /**
  * Simple onboarding panel for TestFox setup
@@ -29,7 +30,7 @@ export class OnboardingPanel {
     private get needsAISetup(): boolean {
         // Check if AI is properly configured
         const config = vscode.workspace.getConfiguration('testfox');
-        const apiKey = config.get<string>('ai.apiKey');
+        const apiKey = getCachedApiKey();
         const provider = config.get<string>('ai.provider');
         const aiEnabled = config.get<boolean>('ai.enabled', true);
         
@@ -167,8 +168,7 @@ export class OnboardingPanel {
         // Check if setup is already completed
         console.log('🎯 Onboarding Panel: Checking setup completion status...');
         const setupCompleted = context.globalState.get<boolean>('testfox.setupCompleted', false);
-        const config = vscode.workspace.getConfiguration('testfox');
-        const apiKey = config.get<string>('ai.apiKey');
+        const apiKey = getCachedApiKey();
 
         console.log('🎯 Onboarding Panel: Setup completion check:', {
             setupCompleted: setupCompleted,
@@ -261,13 +261,13 @@ export class OnboardingPanel {
 
         try {
             const config = vscode.workspace.getConfiguration('testfox');
-            await config.update('ai.apiKey', apiKey, vscode.ConfigurationTarget.Global);
+            await setApiKey(apiKey);
             await config.update('ai.model', 'google/gemini-2.0-flash-exp:free', vscode.ConfigurationTarget.Global);
 
             // Update OpenRouter client
             const openRouter = getOpenRouterClient();
             openRouter.setApiKey(apiKey);
-            openRouter.loadConfiguration();
+            void openRouter.loadConfiguration();
 
             this._panel.webview.postMessage({
                 command: 'apiKeySaved',
@@ -512,8 +512,8 @@ export class OnboardingPanel {
                 const client = getOpenRouterClient();
                 await client.saveApiKey(this._context, apiKey);
             } else {
-                // For other providers, still save in config for now
-                await config.update('ai.apiKey', apiKey || '', vscode.ConfigurationTarget.Global);
+                // Other providers: key goes to SecretStorage too
+                await setApiKey(apiKey || '');
             }
 
             // Test the AI service
@@ -808,9 +808,7 @@ export class OnboardingPanel {
     private async _handleCompleteSetup(): Promise<void> {
         try {
             // Mark setup as completed in global state
-            const config = vscode.workspace.getConfiguration('testfox');
-            const apiKey = config.get<string>('ai.apiKey');
-            if (apiKey) {
+            if (await hasApiKey()) {
                 // Mark setup as completed in global state
                 await this._context.globalState.update('testfox.setupCompleted', true);
             }

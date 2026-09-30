@@ -50,6 +50,7 @@ import { MCPIntegrationManager } from './core/mcpIntegrationManager';
 import { detectSwaggerSpec } from './core/swaggerParser';
 import { generateSwaggerTestCases, generatePostmanCollection, savePostmanCollection } from './generators/swaggerTestGenerator';
 import { generateEnhancedRuleTests } from './generators/enhancedRuleTests';
+import { initializeSecureKeyStore, migrateApiKeyToSecrets, getApiKey, getCachedApiKey } from './core/secureKeyStore';
 
 let projectDetector: ProjectDetector;
 let codeAnalyzer: CodeAnalyzer;
@@ -161,6 +162,10 @@ export async function activate(context: vscode.ExtensionContext) {
     isActivated = true;
     extensionContext = context;
 
+    // Secure key storage: migrate any plaintext API key from settings, then prime the cache
+    initializeSecureKeyStore(context);
+    void migrateApiKeyToSecrets(context).then(() => getApiKey()).catch(() => {});
+
     // Initialize output channel early
     outputChannel = vscode.window.createOutputChannel('TestFox Diagnostics');
 
@@ -181,7 +186,7 @@ export async function activate(context: vscode.ExtensionContext) {
             aiEnabled: config.get('ai.enabled'),
             aiProvider: config.get('ai.provider'),
             aiModel: config.get('ai.model'),
-            hasApiKey: !!config.get('ai.apiKey')
+            hasApiKey: !!getCachedApiKey()
         });
     } catch (error) {
         console.log('TestFox: Cache clear skipped (no cache to clear)');
@@ -1510,10 +1515,10 @@ export async function activate(context: vscode.ExtensionContext) {
                 try {
                 if (e.affectsConfiguration('testfox.ai')) {
                         try {
-                    loadAIConfiguration(context);
+                    void loadAIConfiguration(context);
                             const openRouter = getOpenRouterClient();
                             if (openRouter) {
-                    openRouter.loadConfiguration();
+                    void openRouter.loadConfiguration();
                     openRouter.updateStatusBar();
                             }
                         } catch (error) {
@@ -1713,9 +1718,9 @@ function updateStatus(status: 'ready' | 'analyzing' | 'running' | 'stopped' | 'e
 /**
  * Load AI configuration and update status bar
  */
-function loadAIConfiguration(context: vscode.ExtensionContext): void {
+async function loadAIConfiguration(context: vscode.ExtensionContext): Promise<void> {
     const config = vscode.workspace.getConfiguration('testfox');
-    const apiKey = config.get<string>('ai.apiKey');
+    const apiKey = await getApiKey();
     const model = config.get<string>('ai.model', '');
     const provider = config.get<string>('ai.provider', '');
 
@@ -1723,7 +1728,7 @@ function loadAIConfiguration(context: vscode.ExtensionContext): void {
         try {
             const openRouter = getOpenRouterClient();
             if (apiKey) openRouter.setApiKey(apiKey);
-            openRouter.loadConfiguration();
+            void openRouter.loadConfiguration();
         } catch (err) {
             console.log('TestFox: OpenRouter client update skipped:', err);
         }
@@ -1908,7 +1913,7 @@ async function checkAndTestAI(context: vscode.ExtensionContext): Promise<void> {
  */
 async function testAIConnectionSilent(): Promise<void> {
     const config = vscode.workspace.getConfiguration('testfox');
-    const apiKey = config.get<string>('ai.apiKey', '');
+    const apiKey = await getApiKey();
     const baseUrl = config.get<string>('ai.baseUrl', '');
     const model = config.get<string>('ai.model', '');
     const provider = config.get<string>('ai.provider', '');
